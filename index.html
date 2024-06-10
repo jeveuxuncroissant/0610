@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Modern Chatroom with Gemini API</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+        }
+
+        #chatContainer {
+            background-color: #34495e;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        h1 {
+            background-color: #1abc9c;
+            color: white;
+            margin: 0;
+            padding: 15px;
+            text-align: center;
+        }
+
+        #messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background-color: #2c3e50;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            width: fit-content;
+            max-width: 70%;
+            word-wrap: break-word;
+            font-size: 1em;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .user {
+            background-color: #1abc9c;
+            align-self: flex-end;
+            color: white;
+        }
+
+        .bot {
+            background-color: #95a5a6;
+            align-self: flex-start;
+            color: white;
+        }
+
+        #messageForm {
+            display: flex;
+            padding: 15px;
+            background-color: #34495e;
+            border-top: 1px solid #2c3e50;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #7f8c8d;
+            border-radius: 15px;
+            font-size: 1em;
+            margin-right: 10px;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            transition: border-color 0.3s;
+        }
+
+        #messageInput:focus {
+            border-color: #1abc9c;
+            outline: none;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #1abc9c;
+            color: white;
+            font-size: 1em;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #16a085;
+        }
+        @keyframes typing {
+            0% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+
+        .typing {
+            animation: typing 0.5s steps(1) forwards;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="introBlock">
+        <h2>歡迎來到《夢回高中》</h2>
+        <p>在《夢回高中》時，每一個選擇都將帶來不同的結果和體驗。你將穿越回高中時期，挖掘當年的真相，並在友情和道德之間做出抉擇。</p>
+        <button id="startButton">Start Game</button>
+    </div>
+    <div id="backgroundWrapper">
+        <button id="introButton">遊戲介紹</button>
+        <div id="gameContainer">一場突發事件後，你陷入夢境中，遇見一隻神秘的貓咪，透過這段夢境，你們探討了友情和道德價值觀的主題。
+            <div id="messages"></div>
+            <form id="messageForm">
+                <input type="text" id="messageInput" placeholder="Type your command...">
+            </form>
+        </div>
+    </div>
+    <script>
+        var conversationHistory = [];
+    
+        var apiKey = prompt("Please enter your API key:", "");
+        var userName = prompt("Please enter your name:", "");
+    
+        if (!apiKey || !userName) {
+            alert("API key and name are required to use the chatroom.");
+            // Optionally, redirect or disable form
+        } else {
+            document.getElementById('messageForm').addEventListener('submit', function (event) {
+                event.preventDefault();
+                var inputElement = document.getElementById('messageInput');
+                var message = inputElement.value;
+    
+                addToConversationHistory('user', message);
+                displayMessage(message, 'user');
+                inputElement.disabled = true;
+                fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDyWq8Maj3-s3lBzgi2-HynNJkAEn10tHA' + apiKey, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        "contents": conversationHistory,
+                        "safetySettings": [
+                            {
+                                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                                "threshold": "BLOCK_NONE"
+                            },
+                            {
+                                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                                "threshold": "BLOCK_NONE"
+                            },
+                        ],
+                        "generationConfig": {
+                            "stopSequences": [
+                                ""
+                            ],
+                            "temperature": 2.0,
+                            "maxOutputTokens": 2048,
+                            "topP": 0.8,
+                            "topK": 10
+                        }
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        var responseText = data.candidates[0].content.parts[0].text;
+                        addToConversationHistory('model', responseText);
+                        displayMessage(responseText, 'bot');
+                        inputElement.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Error:', error)
+                        inputElement.disabled = false;
+                    });
+    
+                document.getElementById('messageInput').value = '';
+            });
+        }
+    
+        function addToConversationHistory(role, text) {
+            conversationHistory.push({
+                "role": role,
+                "parts": [{
+                    "text": text
+                }]
+            });
+        }
+    
+        function displayMessage(message, sender) {
+        var messageElement = document.createElement('div');
+        var formatMessage = formatText(message);
+        messageElement.classList.add('message');
+        if (sender === 'user') {
+            messageElement.classList.add('userMessage');
+        } else {
+            messageElement.classList.add('botMessage');
+        }
+        document.getElementById('messages').appendChild(messageElement);
+        updateSceneImage(message);
+        // Function to display the text one character at a time
+        function typeText(element, text, index) {
+            if (index < text.length) {
+                let char = text[index];
+                if (char === '<') {
+                    let endIndex = text.indexOf('>', index);
+                    if (endIndex !== -1) {
+                        element.innerHTML += text.substring(index, endIndex + 1);
+                        index = endIndex + 1;
+                    }
+                } else {
+                    element.innerHTML += char;
+                    index++;
+                }
+                setTimeout(function () {
+                    typeText(element, text, index);
+                }, 75); // Adjust typing speed by changing the delay (in milliseconds)
+            } else {
+                // Scroll to bottom after the entire message is displayed
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            }
+        }
+
+        // Start typing the formatted message
+        typeText(messageElement, formatMessage, 0);
+    }
+
+    function updateSceneImage(responseText) {
+        let sceneMatch = responseText.match(/場景：(.*?)\s/); // 使用正則表達式匹配場景描述
+        if (sceneMatch && sceneMatch[1]) {
+            let scene = sceneMatch[1];
+            console.log(scene);
+            // 檢查scene是否包含"宿舍"
+            if (scene.includes("夢境")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('C:\Users\leo26\OneDrive\桌面\0506\img\deram.jpg')";
+            } else if (scene.includes("偷竊")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('C:\Users\leo26\OneDrive\桌面\0506\img\nomoney.jpg')";
+            } else if (scene.includes("圖書館")) {
+                document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/library.jpeg')";
+            }
+        }
+    }
+
+    function formatText(text) {
+        // Replace ** with a new line and bold tag
+        let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong>');
+
+        // Replace * with a new line and bullet point
+        formattedText = formattedText.replace(/\*(.*?)\s/g, '<br>$1');
+
+        return formattedText;
+    }
+
+    document.getElementById('introButton').addEventListener('click', function () {
+        document.getElementById('introBlock').style.display = 'block';
+        this.style.display = 'none'; // Hide the intro button
+        document.getElementById('startButton').style.display = 'block'; // Show the start button
+    });
+
+    document.getElementById('startButton').addEventListener('click', function () {
+        // Change background image and display settings when starting the game
+        document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/dorm.jpeg')";
+        document.getElementById('introBlock').style.display = 'none'; // Show the game container
+        document.getElementById('gameContainer').style.display = 'inline';
+        document.getElementById('introButton').style.display = 'none'; // Hide the start button
+    });
+        conversationHistory.push({
+            "role": 'user',
+            "parts": [{
+                "text": `腳本：
+                **故事背景**：一場突發事件後，${userName}陷入夢境中，遇見一隻神秘的貓咪，透過這段夢境，${userName}們探討了友情和道德價值觀的主題。
+
+---
+
+**場景1：進入友情篇章**
+<場景>：${userName}和貓咪從夢境入口進入一個熟悉的高中校園。
+<對話>：
+${userName}：這是我的高中？好多年沒來了。
+貓咪：喵~（這是${userName}的友情篇章，${userName}需要重新體驗和理解友情的價值。）
+${userName}：好吧，那我們從哪開始？
+貓咪：喵~（跟我來，讓我們一起找回那些回憶。）
+
+---
+
+**場景2：發現偷竊事件**
+<場景>：教室裡，同學們發現錢被偷，大家議論紛紛。
+<對話>：
+同學甲：我的錢包裡怎麼少500塊！我最近又沒買什麼東西。
+同學乙：傻眼！我少了2000塊！完蛋了，我這個月不用吃飯了。
+
+${userName}：（內心獨白）啊，這是一堆人被偷錢的時候，我記得最後好像沒找到兇手...
+貓咪：喵~（你應該仔細觀察，看看能不能找到線索。）
+
+---
+
+**場景3：發現小明的異樣**
+<場景>：${userName}注意到小明體育課時跑到沒人的教室裡。
+<對話>：
+${userName}：（內心獨白）還沒下課小明怎麼自己回教室了？他是忘記帶什麼嗎？
+<場景>：${userName}悄悄跟隨小明，看到他從同學的書包裡翻出錢包。
+<對話>：
+${userName}：（內心獨白）喔不，那時候居然是小明偷了同學們的錢？
+
+貓咪：喵~（這是個困難的選擇，你需要決定如何處理這件事。）
+
+---
+
+**場景4：如何處理發現的真相**
+<選擇>：請根據以下選項做出選擇：
+1. 立即拆穿小明，告訴老師。
+2. 私下找小明談談，勸他還錢。
+3. 假裝沒看見，繼續走開。
+
+---
+
+**若選擇1：立即拆穿小明，告訴老師**
+<場景>：${userName}走上前制止，並告訴老師。
+<對話>：
+${userName}：老師，小明偷了同學的錢！
+老師：小明，這是真的嗎？快把錢還給同學。
+小明：對不起，我是一時糊塗。
+貓咪：喵~（${userName}選擇了正直，但這可能會影響${userName}們的友情。）
+<場景>：事後，小明被同學孤立和欺負。
+<對話>：
+同學甲：滾啦小偷！
+小明：我真的很對不起……
+${userName}：（內心獨白）我只是想幫助他，但事情變得更糟了。
+
+貓咪：喵~（${userName}的選擇讓真相大白，但也讓${userName}的朋友陷入困境。）
+<場景>：${userName}試圖安慰小明，但兩人之間的距離已經加大。
+<對話>：
+小明：${userName}雖然揭發了我，但還是謝謝${userName}。只是我們的友情，可能再也回不去了。
+${userName}：對不起，我以為這樣做是對的……
+<場景>：場景結束。
+
+---
+
+**若選擇2：私下找小明談談，勸他還錢**
+<場景>：放學後，${userName}找到小明，希望私下與他談談。
+<對話>：
+${userName}：最近我發現了一些事情。${userName}看起來好像有些煩惱，而且我也看到${userName}偷了錢。
+小明：其實是這樣子的。我……我真的不得已。${userName}知道的，我家的情況最近超糟，房租拖了好幾個月了，我爸媽都失業了。我只是有點迫不得已...
+${userName}：我完全能理解。這實在太糟糕了。但${userName}得告訴我，我們一起想辦法。
+小明：我知道了。我會盡快把錢還回去。謝謝${userName}提醒我。
+
+（突然，貓咪跳了過來，眼睛睜得大大的，用力搖搖尾巴）
+貓咪：喵~（看起來${userName}會需要更多的證據來確保他真的會改變。）
+<場景>：小明面露微笑，但眼中卻閃過一絲陰影。
+
+---
+
+**若選擇3：假裝沒看見**
+<場景>：${userName}離開現場，心裡感到不安，幾天後${userName}發現自己的錢也被偷了。
+<對話>：
+貓咪：喵~（${userName}選擇了回避，這可能會讓事情變得更糟。）
+${userName}：沒想到他也會這樣對我。
+
+---
+
+**場景5：後果與反思**
+<場景>：班上發現錢丟失，大家在討論，${userName}心中糾結。
+<對話>：
+老師：同學們，有人知道錢的下落嗎？
+同學乙：我好餓，要吃土吃到什麼時候...
+${userName}：（內心獨白）我應該做些什麼？這件事必須解決。
+
+---
+
+**選擇：**
+<選擇>：請根據以下選項做出選擇：
+1. 承認自己知道真相，並幫助解決問題。
+2. 繼續保持沉默，看事情如何發展。
+
+---
+
+**若選擇1且剛剛選B**
+<對話>：
+${userName}：小明，我之前相信${userName}，希望${userName}能改正錯誤，但我發現${userName}又偷了其他同學的錢。
+小明：${userName}不能這樣做！我真的會還錢的，拜託${userName}別說！
+${userName}：我不想傷害我們的友情，但我也不能視而不見。
+小明：我真的沒辦法了，我家裡真的很需要這些錢。${userName}是我唯一的朋友，拜託${userName}再給我一次機會。
+${userName}：（內心獨白）他是我的朋友，我知道他有困難。但如果我再保持沉默，其他同學怎麼辦？
+小明：${userName}知道嗎，我從來沒有這麼害怕過，我怕失去${userName}這個朋友。拜託${userName}，別告訴別人，我會改的。
+${userName}：小明，我不能看著${userName}越走越遠。我決定跟大家說，但我們會一起面對後果。我不會讓${userName}一個人承擔。
+小明：${userName}…${userName}真的要這麼做？
+${userName}：是的，因為我在乎${userName}。我不能讓${userName}繼續這樣下去。
+
+<場景>：${userName}和小明一起站在教室前，向全班同學承認了小明的錯誤，並承諾一起解決問題。
+
+---
+
+**若選擇1且剛剛選C**
+<場景>：放學後，${userName}和小明獨處在教室裡。
+<對話>：
+${userName}：小明，我知道${userName}拿了錢。
+小明：（驚訝）${userName}...${userName}怎麼知道？
+${userName}：我看到了。但我也了解${userName}，知道${userName}不是故意的。到底發生了什麼事？
+小明：我...我家最近有點困難，所以我不得不...
+${userName}：我明白了。但這樣不行，我們不能
+
+輕易放棄。
+（${userName}顯得猶豫不決，他的表情透露出一絲糾結。）
+小明：我知道，但我實在找不到其他辦法。
+${userName}：我們可以一起想辦法，不會讓${userName}獨自承擔這一切。但我們也要面對真相，這樣才能找到解決的方法。
+小明：（默默地點點頭）
+（${userName}的表情仍然糾結，但最終他決定揭露真相。）
+<場景>：場景結束。
+
+---
+
+**若選擇2：繼續保持沉默，看事情如何發展**
+<場景>：${userName}保持沉默，教室裡的氣氛變得凝重。
+<對話>：
+（${userName}的表情充滿了內心的糾結和不安）
+貓咪：喵~（沉默的氛圍可能會讓問題更加複雜。）
+
+最後，事情和當年一樣沒有被解決，${userName}疏遠小明，導致了感情上的疙瘩。
+<場景>：場景結束。 `
+
+            }]
+        })
+        
+        document.getElementById('messageForm').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var inputElement = document.getElementById('messageInput');
+    var message = inputElement.value;
+
+    addToConversationHistory('user', message);
+    displayMessage(message, 'user');
+    inputElement.disabled = true;
+
+    // 判斷訊息中是否包含特定關鍵字，然後根據關鍵字切換圖片
+    updateSceneImage(message);
+    updateSceneImage('發現偷竊事件');
+    fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=AIzaSyDyWq8Maj3-s3lBzgi2-HynNJkAEn10tHA' + apiKey, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            "contents": conversationHistory,
+            "safetySettings": [
+                {
+                    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    "threshold": "BLOCK_NONE"
+                },
+                {
+                    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    "threshold": "BLOCK_NONE"
+                },
+            ],
+            "generationConfig": {
+                "stopSequences": [
+                    ""
+                ],
+                "temperature": 2.0,
+                "maxOutputTokens": 2048,
+                "topP": 0.8,
+                "topK": 10
+            }
+        })
+    })
+        .then(response => response.json())
+        .then(data => {
+            var responseText = data.candidates[0].content.parts[0].text;
+            addToConversationHistory('model', responseText);
+            displayMessage(responseText, 'bot');
+            inputElement.disabled = false;
+        })
+        .catch(error => {
+            console.error('Error:', error)
+            inputElement.disabled = false;
+        });
+
+    document.getElementById('messageInput').value = '';
+});
+
+    </script>
+</body>
+
+</html>
+
+
