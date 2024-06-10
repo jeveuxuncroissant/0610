@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>夢回高中</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 0;
+        }
+        #introBlock {
+            text-align: center;
+            padding: 50px;
+            background-color: #ffffff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+            border-radius: 10px;
+        }
+        #gameContainer {
+            display: none;
+            padding: 20px;
+        }
+        #backgroundWrapper {
+            background-size: cover;
+            background-position: center;
+            height: 100vh;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #messages {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .userMessage {
+            background-color: #d1e7dd;
+            text-align: right;
+        }
+        .botMessage {
+            background-color: #f8d7da;
+            text-align: left;
+        }
+        #messageForm {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        #messageInput {
+            padding: 10px;
+            width: 80%;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="introBlock">
+        <h2>歡迎來到《夢回高中》</h2>
+        <p>在《夢回高中》時，每一個選擇都將帶來不同的結果和體驗。你將穿越回高中時期，挖掘當年的真相，並在友情和道德之間做出抉擇。</p>
+        <button id="startButton">開始遊戲</button>
+    </div>
+    <div id="backgroundWrapper">
+        <button id="introButton">遊戲介紹</button>
+        <div id="gameContainer">
+            <div id="messages"></div>
+            <form id="messageForm">
+                <input type="text" id="messageInput" placeholder="輸入你的指令...">
+            </form>
+        </div>
+    </div>
+    <script>
+        var conversationHistory = [];
+
+        var apiKey = prompt("請輸入您的API密鑰:", "");
+        var userName = prompt("請輸入您的名字:", "");
+
+        if (!apiKey || !userName) {
+            alert("使用聊天室需要提供API密鑰和名字。");
+        } else {
+            document.getElementById('messageForm').addEventListener('submit', function (event) {
+                event.preventDefault();
+                var inputElement = document.getElementById('messageInput');
+                var message = inputElement.value;
+
+                addToConversationHistory('user', message);
+                displayMessage(message, 'user');
+                inputElement.disabled = true;
+                fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=' + apiKey, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        "contents": conversationHistory,
+                        "safetySettings": [
+                            {
+                                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                                "threshold": "BLOCK_NONE"
+                            },
+                            {
+                                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                                "threshold": "BLOCK_NONE"
+                            }
+                        ],
+                        "generationConfig": {
+                            "stopSequences": [
+                                ""
+                            ],
+                            "temperature": 2.0,
+                            "maxOutputTokens": 256, // 限制回覆的字數
+                            "topP": 0.8,
+                            "topK": 10
+                        }
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        var responseText = data.candidates[0].content.parts[0].text;
+                        addToConversationHistory('model', responseText);
+                        displayMessage(responseText, 'bot');
+                        inputElement.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        inputElement.disabled = false;
+                    });
+
+                document.getElementById('messageInput').value = '';
+            });
+        }
+
+        function addToConversationHistory(role, text) {
+            conversationHistory.push({
+                "role": role,
+                "parts": [{
+                    "text": text
+                }]
+            });
+        }
+
+        function displayMessage(message, sender) {
+            var messageElement = document.createElement('div');
+            var formatMessage = formatText(message);
+            messageElement.classList.add('message');
+            if (sender === 'user') {
+                messageElement.classList.add('userMessage');
+            } else {
+                messageElement.classList.add('botMessage');
+            }
+            document.getElementById('messages').appendChild(messageElement);
+            updateSceneImage(message);
+            typeText(messageElement, formatMessage, 0);
+        }
+
+        function typeText(element, text, index) {
+            if (index < text.length) {
+                let char = text[index];
+                if (char === '<') {
+                    let endIndex = text.indexOf('>', index);
+                    if (endIndex !== -1) {
+                        element.innerHTML += text.substring(index, endIndex + 1);
+                        index = endIndex + 1;
+                    }
+                } else {
+                    element.innerHTML += char;
+                    index++;
+                }
+                setTimeout(function () {
+                    typeText(element, text, index);
+                }, 75);
+            } else {
+                document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+            }
+        }
+
+        function updateSceneImage(responseText) {
+            let sceneMatch = responseText.match(/場景：(.*?)\s/);
+            if (sceneMatch && sceneMatch[1]) {
+                let scene = sceneMatch[1];
+                console.log(scene);
+                if (scene.includes("夢境")) {
+                    document.getElementById('backgroundWrapper').style.backgroundImage = "url('C:\Users\leo26\OneDrive\桌面\game\img\dream.jpeg')";
+                } else if (scene.includes("教室")) {
+                    document.getElementById('backgroundWrapper').style.backgroundImage = "url('C:\Users\leo26\OneDrive\桌面\game\img\nomoney.jpeg')";
+                } else if (scene.includes("圖書館")) {
+                    document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/library.jpeg')";
+                }
+            }
+        }
+
+        function formatText(text) {
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong>');
+            formattedText = formattedText.replace(/\*(.*?)\s/g, '<br>$1');
+            return formattedText;
+        }
+
+        document.getElementById('introButton').addEventListener('click', function () {
+            document.getElementById('introBlock').style.display = 'block';
+            this.style.display = 'none';
+            document.getElementById('startButton').style.display = 'block';
+        });
+
+        document.getElementById('startButton').addEventListener('click', function () {
+            document.getElementById('backgroundWrapper').style.backgroundImage = "url('./img/dorm.jpeg')";
+            document.getElementById('introBlock').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'block';
+            document.getElementById('introButton').style.display = 'none';
+        });
+
+        conversationHistory.push({
+            "role": 'user',
+            "parts": [{
+                "text": `腳本：
+                遊戲標題:夢回高中
+                **故事背景**：一場突發事件後，${userName}陷入夢境中，遇見一隻神秘的貓咪，透過這段夢境，${userName}們探討了友情和道德價值觀的主題。
+                主要角色：
+                        ${userName}：主角，善良的人類。
+                        小明：${userName}的高中朋友，開朗活潑，似乎有著不可告人的秘密。
+                        貓咪：${userName}進入夢境後遇到的貓咪，個性活潑，引導主角進入夢境。
+                        
+                        遊戲腳本流程
+---
+開場
+
+(場景：夢境)
+<一場突發事件後，${userName}陷入夢境中，遇見一隻神秘的貓咪，透過這段夢境，${userName}們探討了友情和道德價值觀的主題。現在，${userName}和貓咪從夢境入口進入一個熟悉的高中校園。>
+<選擇>：
+選擇1跟隨貓咪，探索校園。
+選擇2停下來，仔細觀察周圍。
+請選擇：1 或 2
+
+發現偷竊事件
+(場景：教室)
+<同學們發現錢被偷，大家議論紛紛。>
+<對話：
+同學甲：我的錢包裡怎麼少500塊！我最近又沒買什麼東西。
+同學乙：傻眼！我少了2000塊！完蛋了，我這個月不用吃飯了。>
+${userName}：（內心獨白）啊，這是一堆人被偷錢的時候，我記得最後好像沒找到兇手...
+貓咪：喵~（${userName}應該仔細觀察，看看能不能找到線索。）
+
+<選擇>：
+選擇1詢問同學發生了什麼事。
+選擇2保持沉默，偷偷觀察。
+請選擇：1 或 2
+
+如何處理發現的真相
+(場景：體育課)
+<${userName}注意到小明時跑到沒人的教室裡，發現他從同學的書包裡翻出錢包。>
+${userName}：（內心獨白）喔不，那時候居然是小明偷了同學們的錢？
+貓咪：喵~（這是個困難的選擇，${userName}需要決定如何處理這件事。）
+
+<選擇>：
+
+選擇1立即拆穿小明，告訴老師。
+選擇2私下找小明談談，勸他還錢。
+選擇3假裝沒看見，繼續走開。
+請選擇：1、2 或 3
+
+結局1：友情的重新建立
+如果玩家選擇私下找小明談談，勸他還錢，並在事後選擇揭露真相，則結局可能是：
+
+${userName}與小明一起面對了問題，雖然友情經歷了考驗，但他們通過坦誠和努力重新建立了信任。雖然在學校裡，小明可能受到了一些歧視和壓力，但${userName}一直支持他，一起面對了困難。他們的友誼因為這次經歷變得更加堅固，彼此之間的信任也更加深厚。
+
+結局2：友情的疏離
+如果玩家選擇立即拆穿小明，告訴老師，則結局可能是：
+
+雖然小明最終被揭發，但同學們對他的態度變得冷淡，導致他在班上孤立無援。${userName}雖然本意是想幫助小明，但這次的行動卻讓他們之間的友情遭受了嚴重考驗，甚至變得疏離。儘管事情揭露了真相，但這次經歷對於他們的友誼造成了無法彌補的傷害。
+
+結局3：後果的無法挽回
+如果玩家選擇假裝沒看見，繼續走開，則結局可能是：
+
+事情沒有得到解決，後來${userName}自己的錢也被偷了。這次選擇的後果讓${userName}深感後悔和無奈，他們的友情也因為這次的事件受到了嚴重損害，甚至變得難以挽回。在面對困境時選擇逃避，最終只會讓問題變得更加複雜，對於友情和正義都是一種損失。
+請根據腳本中的對話，根據"""開場"""到"""偷竊事件""最後到"""如何處理發現的真相"""進行，開始一個文字冒險遊戲，每一次的對話，都需要呈現以下格式與資訊：
+                        <場景>：目前故事的背景為何
+                        <選擇>：在每一次的對話中，你都會根據腳本給我可以選擇的動作，根據我選擇的動作繼續接下來的劇情，整體劇情會圍繞腳本發展。 `
+                
+            }]
+        });
+        displayMessage("一場突發事件後，你陷入夢境中，遇見一隻神秘的貓咪，透過這段夢境，你們探討了友情和道德價值觀的主題。", 'bot');
+    </script>
+</body>
+</html>
+
+
+
+
+
